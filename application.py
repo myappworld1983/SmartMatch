@@ -106,6 +106,11 @@ def perform_clustering():
         }
         clustered_collection.insert_one(clustered_document)
 
+# Health check endpoint
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 @app.route('/login', methods=['POST'])
 def login():
     username = request.json.get('username', None)
