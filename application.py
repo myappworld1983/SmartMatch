@@ -130,19 +130,33 @@ def process_image():
     user_id = data['user_id']
     s3_path = data['s3_path']
     
-    image_bytes = load_image_from_s3(s3_path)
-    labels_with_confidence = get_labels_from_image(image_bytes)
-    
-    weighted_vector_values = [{'weight': label_info['Confidence'], 'label': label_info['Name']} for label_info in labels_with_confidence]
-    
-    document = {
-        'user_id': user_id,
-        'image_path': s3_path,
-        'labels': labels_with_confidence,
-        'weighted_vector_values': weighted_vector_values
-    }.insert_one(document)
+    # List all images in the specified S3 path
+    s3 = boto3.client('s3')
+    bucket_name = s3_path.split('/')[2]
+    prefix = '/'.join(s3_path.split('/')[3:])
 
-    # Perform clustering after processing the image
-    perform_clustering()
-    
-    return jsonify({"message": "Image processed, clustering updated, and data stored successfully."})
+    response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
+    # Process each image in the S3 path
+    if 'Contents' in response:
+        for obj in response['Contents']:
+            image_key = obj['Key']
+            image_bytes = load_image_from_s3(f"s3://{bucket_name}/{image_key}")
+            labels_with_confidence = get_labels_from_image(image_bytes)
+            
+            weighted_vector_values = [{'weight': label_info['Confidence'], 'label': label_info['Name']} for label_info in labels_with_confidence]
+            
+            document = {
+                'user_id': user_id,
+                'image_path': f"s3://{bucket_name}/{image_key}",
+                'labels': labels_with_confidence,
+                'weighted_vector_values': weighted_vector_values
+            }
+            collection.insert_one(document)
+
+        # Perform clustering after processing all images
+        perform_clustering()
+        
+        return jsonify({"message": "All images processed, clustering updated, and data stored successfully."})
+    else:
+        return jsonify({"message": "No images found in the specified S3 path."}), 404
