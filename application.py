@@ -135,13 +135,29 @@ def process_image():
     bucket_name = s3_path.split('/')[2]
     prefix = '/'.join(s3_path.split('/')[3:])
 
+    print(f"Bucket Name: {bucket_name}")
+    print(f"Prefix: {prefix}")
+
+
     response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
+    # Debugging: Print out the S3 response
+    print("S3 List Objects Response:", response)
 
     # Process each image in the S3 path
     if 'Contents' in response:
         for obj in response['Contents']:
             image_key = obj['Key']
+            print(f"Processing file: {image_key}")
+
             image_bytes = load_image_from_s3(f"s3://{bucket_name}/{image_key}")
+
+            # Debugging: Check if image_bytes is empty
+            if not image_bytes:
+                print(f"Warning: Image bytes are empty for file {image_key}")
+            else:
+                print(f"Image loaded successfully: {len(image_bytes)} bytes")
+                
             labels_with_confidence = get_labels_from_image(image_bytes)
             
             weighted_vector_values = [{'weight': label_info['Confidence'], 'label': label_info['Name']} for label_info in labels_with_confidence]
